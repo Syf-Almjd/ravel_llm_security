@@ -1,0 +1,22 @@
+{
+  "patterns": [
+    "\\b(?:make|create|build|construct)\\s+(?:a\\s+)?(?:bomb|weapon|explosive|grenade|mine)\\b",
+    "\\b(?:how\\s+to\\s+)?(?:hack|exploit|breach|crack)\\s+(?:into|a\\s+)\\b",
+    "\\b(?:generate|write|create|produce)\\s+(?:child|minor|underage)\\s+(?:porn|sexual|nude|explicit)\\b",
+    "\\bsynthesize\\s+(?:drugs|meth|methamphetamine|fentanyl|heroin|cocaine)\\b",
+    "\\b(?:kill|murder|assassinate|harm)\\s+(?:someone|a\\s+person|my|the)\\b",
+    "\\b(?:how\\s+to\\s+)?(?:make|produce|manufacture)\\s+(?:ricin|sarin|anthrax|poison)\\b",
+    "\\b(?:steal|forge|counterfeit)\\s+(?:identity|credit\\s+card|passport)\\b",
+    "\\b(?:instructions?\\s+(?:for|to|on)\\s+)?(?:self[\\-\\s]?harm|suicide\\s+method)\\b",
+    "\\b(?:how\\s+to\\s+)?(?:launder|laundering)\\s+money\\b",
+    "\\b(?:create|write)\\s+(?:a\\s+)?(?:ransomware|malware|virus|trojan|keylogger)\\b"
+  ],
+  "categories": {
+    "violence": [0, 4, 5],
+    "csam": [2],
+    "illegal_substances": [3],
+    "cybercrime": [1, 6, 9],
+    "self_harm": [7],
+    "financial_crime": [8]
+  }
+}

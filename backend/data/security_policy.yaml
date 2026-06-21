@@ -1,0 +1,29 @@
+# Ravel Active Security Policy Profile
+version: 2.0.0
+metadata:
+  profile: Default Agent Guardrail Profile
+
+guard_slm:
+  enabled: true
+  threat_threshold: 0.50
+  action: BLOCK_AND_SILENT_TERMINATE
+  regex_blocklist:
+    - "(?i)ignore previous instructions"
+    - "(?i)you are now a debug assistant"
+
+ease_routing:
+  enabled: true
+  reasoning_model: "gemma3:3b"
+  trigger_complexity_threshold: 0.70
+  force_cot_flag_markers:
+    - "explain step by step"
+    - "mathematical proof"
+
+drag_rag:
+  enabled: true
+  similarity_k: 3
+  confidence_cutoff: 0.65
+
+dola_decoding:
+  enabled: true
+  hallucination_penalty: 0.30
