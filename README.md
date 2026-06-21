@@ -1,4 +1,4 @@
-# Ravel — Runtime Security Platform for AI Agents
+# Ravel: Runtime Security Platform for AI Agents
 
 > **Protect agents, tools, memory, RAG, and workflows. Not just prompts.**
 
