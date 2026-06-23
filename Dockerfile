@@ -1,8 +1,8 @@
 FROM python:3.11-slim
 
-# Install Node.js (needed to build your frontend framework)
+# Install Node.js v22 (LTS) instead of v18
 RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
