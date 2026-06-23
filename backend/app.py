@@ -1007,8 +1007,25 @@ async def update_policy(req: PolicySaveRequest):
 
 # ─── Static Files (Frontend) ────────────────────────────────
 
-nuxt_output_path = os.path.join(os.path.dirname(__file__), "../frontend/.output/public")
+nuxt_output_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "../frontend/.output/public")
+)
 
+if os.path.exists(nuxt_output_path):
+    # Serve compiled Nuxt static assets (JS, CSS, Images)
+    app.mount("/", StaticFiles(directory=nuxt_output_path, html=True), name="frontend")
+    
+    # SPA Fallback handler for client-side routing routes
+    @app.exception_handler(404)
+    async def not_found_exception_handler(request, exc):
+        return FileResponse(os.path.join(nuxt_output_path, "index.html"))
+else:
+    @app.get("/")
+    async def fallback_status():
+        return {
+            "detail": f"Frontend index.html missing at expected path: {nuxt_output_path}. Check container build pipelines."
+        }
+        
 # Mount static files folder if it exists
 _nuxt_path = os.path.join(nuxt_output_path, "_nuxt")
 if os.path.exists(_nuxt_path):
