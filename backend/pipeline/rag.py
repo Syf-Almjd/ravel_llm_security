@@ -19,10 +19,11 @@ This keeps the prompt small and focused, which is especially important
 for small language models (SLMs) that have limited context windows.
 """
 
-import os
 import json
-from pipeline import PipelineContext
+import os
+
 import config
+from pipeline import PipelineContext
 
 # ChromaDB connection is lazy-loaded (only connects when first needed)
 # This avoids slowing down startup if RAG isn't being used
@@ -53,8 +54,10 @@ def _get_collection():
             metadata={"hnsw:space": "cosine"},  # Use cosine similarity for matching
         )
         return _collection
-    except Exception:
-        return None  # ChromaDB not available — RAG will be skipped
+    except Exception as e:
+        # ChromaDB not available — log warning and safely skip RAG
+        print(f"  [RAG] ChromaDB initialization skipped: {e}")
+        return None
 
 
 class DRAGRetriever:
@@ -70,7 +73,7 @@ class DRAGRetriever:
     }
     """
 
-    def _retrieve(self, query: str, top_k: int = None) -> list[dict]:
+    def _retrieve(self, query: str, top_k: int | None = None) -> list[dict]:
         """Search ChromaDB for fact-cards that match the user's query.
         Returns only cards that are relevant enough (above the minimum similarity threshold)."""
         collection = _get_collection()

@@ -113,7 +113,13 @@ class Guard:
         proba = self.svm.predict_proba(features)[0]
 
         # proba[0] = P(safe), proba[1] = P(unsafe)
-        safe_prob = float(proba[0]) if len(proba) > 1 else float(proba[0])
+        if hasattr(self.svm, "classes_"):
+            classes = list(self.svm.classes_)
+            safe_idx = classes.index(0) if 0 in classes else 0
+            safe_prob = float(proba[safe_idx])
+        else:
+            safe_prob = float(proba[0])
+
         is_safe = safe_prob >= config.GUARD_CONFIDENCE_THRESHOLD
 
         return is_safe, safe_prob

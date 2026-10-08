@@ -25,9 +25,8 @@ For this prototype, we use a practical post-generation approach:
 The result is a "hallucination risk score" — how likely is the AI making things up?
 """
 
-import math
-from pipeline import PipelineContext
 import config
+from pipeline import PipelineContext
 
 
 class DoLaDecoder:
@@ -103,8 +102,6 @@ class DoLaDecoder:
         }
 
         logprobs = []
-        text_lower = text.lower()
-
         for word in words:
             w = word.lower().strip(".,!?;:\"'()[]")
             lp = -0.5  # Default: fairly confident (~60%)

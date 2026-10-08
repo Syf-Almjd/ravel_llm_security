@@ -20,9 +20,9 @@ Key features:
 """
 
 import httpx  # Async HTTP client — used to call the Ollama API
-import json
-from pipeline import PipelineContext
+
 import config
+from pipeline import PipelineContext
 
 
 class SLMInference:
