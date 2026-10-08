@@ -3,6 +3,7 @@ Unit tests for Stage 6: DoLa (Hallucination Detector).
 """
 
 import pytest
+
 from pipeline import PipelineContext
 from pipeline.dola import DoLaDecoder
 

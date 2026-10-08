@@ -17,18 +17,16 @@ Memory lifecycle:
   5. EXPORT/IMPORT: Users can backup and transfer their memories as Markdown
 """
 
-import uuid
 import json
 import re
-from datetime import datetime, timezone
-from typing import Optional
+import uuid
+from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy.orm import Session as DBSession
 from sqlalchemy import desc
+from sqlalchemy.orm import Session as DBSession
 
 from database import Memory
-
 
 # ─── Memory Extraction ───────────────────────────────────────
 # After each conversation turn, we ask the AI: "What should we remember?"
@@ -121,7 +119,7 @@ async def extract_memories(
 def retrieve_memories(
     db: DBSession,
     user_id: str,
-    template_id: Optional[str] = None,
+    template_id: str | None = None,
     limit: int = 10,
 ) -> list[Memory]:
     """Load the most relevant memories for this user and persona.
@@ -153,7 +151,7 @@ def retrieve_memories(
 
     # Update access tracking (for analytics and memory decay)
     for m in memories:
-        m.last_accessed = datetime.now(timezone.utc)
+        m.last_accessed = datetime.now(UTC)
         m.access_count = (m.access_count or 0) + 1
     db.commit()
 
@@ -185,9 +183,9 @@ def save_memory(
     user_id: str,
     memory_type: str,
     content: str,
-    template_id: Optional[str] = None,
-    conversation_id: Optional[str] = None,
-    message_id: Optional[str] = None,
+    template_id: str | None = None,
+    conversation_id: str | None = None,
+    message_id: str | None = None,
     importance: float = 0.5,
 ) -> Memory:
     """Create a new memory record in the database."""
@@ -200,7 +198,7 @@ def save_memory(
         source_conversation_id=conversation_id,
         source_message_id=message_id,
         importance=importance,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(memory)
     db.commit()
@@ -212,8 +210,8 @@ def save_extracted_memories(
     db: DBSession,
     user_id: str,
     extracted: list[dict],
-    template_id: Optional[str] = None,
-    conversation_id: Optional[str] = None,
+    template_id: str | None = None,
+    conversation_id: str | None = None,
 ):
     """Save a batch of extracted memories, skipping duplicates.
 
@@ -262,7 +260,7 @@ def export_memories_markdown(db: DBSession, user_id: str, user_email: str = "") 
     lines = [
         "# Ravel Agent Memory Export",
         f"## User: {user_email}",
-        f"## Exported: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"## Exported: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}",
         f"## Total Memories: {len(memories)}",
         "",
     ]

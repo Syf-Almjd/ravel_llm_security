@@ -25,8 +25,9 @@ Three routes:
 """
 
 import re
-from pipeline import PipelineContext
+
 import config
+from pipeline import PipelineContext
 
 # ── Complexity signals ───────────────────────────────────────
 # These regex patterns help classify how complex a question is.

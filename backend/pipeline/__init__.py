@@ -84,7 +84,7 @@ class PipelineContext:
 
 class Pipeline:
     """Runs all registered security stages in sequence.
-    
+
     How it works:
     1. You add stages with `pipeline.add("name", stage_instance)`
     2. You run a query with `pipeline.run("user input")`
@@ -102,16 +102,16 @@ class Pipeline:
 
     async def run(self, raw_input: str, config: dict | None = None) -> PipelineContext:
         """Run the full pipeline on a user input.
-        
+
         Args:
             raw_input: The user's message text
             config: Optional dict to override settings (from persona templates)
-        
+
         Returns:
             PipelineContext with all results filled in
         """
         ctx = PipelineContext(raw_input=raw_input)
-        
+
         # Apply any per-request configuration (from persona skins, etc.)
         if config:
             ctx.ollama_endpoint = config.get("ollama_endpoint", "")

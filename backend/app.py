@@ -35,42 +35,41 @@ import sys
 # Ensure the backend directory is on the path
 sys.path.insert(0, os.path.dirname(__file__))
 
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, Response, FileResponse
-import time
 import json
+import time
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from fastapi import Depends, HTTPException, BackgroundTasks
+from sqlalchemy import func
 
 import config
-import policy_engine
-from pipeline import Pipeline
-from pipeline.sanitizer import Sanitizer
-from pipeline.guard import Guard
-from pipeline.ease import EASERouter
-from pipeline.rag import DRAGRetriever
-from pipeline.inference import SLMInference
-from pipeline.dola import DoLaDecoder
-from pipeline.ris import RISScorer
-from telemetry.metrics import (
-    record_query,
-    get_dashboard_stats,
-    get_prometheus_metrics,
-    reset_stats,
-)
 
 # Auth, DB, Admin and Memory Imports
 import database
-from auth import router as auth_router
-from admin import router as admin_router
-from middleware import require_auth, require_admin
 import memory as memory_sys
-from sqlalchemy import func
-from datetime import datetime, timezone
-
+import policy_engine
+from admin import router as admin_router
+from auth import router as auth_router
+from middleware import require_auth
+from pipeline import Pipeline
+from pipeline.dola import DoLaDecoder
+from pipeline.ease import EASERouter
+from pipeline.guard import Guard
+from pipeline.inference import SLMInference
+from pipeline.rag import DRAGRetriever
+from pipeline.ris import RISScorer
+from pipeline.sanitizer import Sanitizer
+from telemetry.metrics import (
+    get_dashboard_stats,
+    get_prometheus_metrics,
+    record_query,
+    reset_stats,
+)
 
 # ─── Pipeline Assembly ───────────────────────────────────────
 
@@ -96,16 +95,16 @@ async def lifespan(app: FastAPI):
     print("╔══════════════════════════════════════════╗")
     print("║            Ravel v2.0 Starting           ║")
     print("╚══════════════════════════════════════════╝")
-    
+
     # 1. Initialize Database
     database.init_db()
-    
+
     # 2. Seed built-in templates from templates.json on first startup
     db = database.SessionLocal()
     try:
         templates_path = os.path.join(os.path.dirname(__file__), "data", "templates.json")
         if os.path.exists(templates_path):
-            with open(templates_path, "r", encoding="utf-8") as f:
+            with open(templates_path, encoding="utf-8") as f:
                 tpls = json.load(f)
             for t in tpls:
                 existing = db.query(database.AgentTemplate).filter_by(id=t["id"]).first()
@@ -229,7 +228,7 @@ def append_to_history(req_prompt: str, res_text: str, metrics: dict, token_stats
         "metrics": metrics,
         "token_stats": token_stats or []
     })
-    
+
     if len(telemetry_data) > 500:
         telemetry_data.pop(0)
     if len(request_history) > 500:
@@ -371,14 +370,14 @@ async def process_chat(
             status_code=400,
             content={"error": "Prompt cannot be empty"},
         )
-        
+
     conversation_id = req.conversation_id
     if not conversation_id:
         return JSONResponse(
             status_code=400,
             content={"error": "Conversation ID is required"},
         )
-        
+
     conv = db.query(database.Conversation).filter_by(id=conversation_id, user_id=user.id).first()
     if not conv:
         conv = database.Conversation(
@@ -394,7 +393,7 @@ async def process_chat(
     system_prompt = ""
     if req.template_id:
         tpl = db.query(database.AgentTemplate).filter(
-            (database.AgentTemplate.id == req.template_id) & 
+            (database.AgentTemplate.id == req.template_id) &
             ((database.AgentTemplate.is_builtin == True) | (database.AgentTemplate.user_id == user.id))
         ).first()
         if tpl:
@@ -414,15 +413,15 @@ async def process_chat(
         conversation_id=conversation_id,
         sender="user",
         text=req.prompt,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC)
     )
     db.add(new_user_msg)
-    
+
     # Auto-rename title if default
     msg_count = db.query(func.count(database.Message.id)).filter_by(conversation_id=conversation_id).scalar() or 0
     if msg_count <= 1 or conv.title in ("New Session", "Initial Session", "New Security Session"):
         conv.title = req.prompt[:30] + "..." if len(req.prompt) > 30 else req.prompt
-    conv.updated_at = datetime.now(timezone.utc)
+    conv.updated_at = datetime.now(UTC)
     db.commit()
 
     # Map toggles to pipeline config
@@ -436,11 +435,11 @@ async def process_chat(
         "system_prompt": system_prompt,
         "formatted_memories": formatted_memories
     }
-    
+
     ctx = await pipeline.run(req.prompt, config=pipeline_config)
     record_query(ctx)
     res = ctx.to_response()
-    
+
     # Compute metrics for chat.js
     stage_lats = res["pipeline_trace"]["stage_latencies_ms"]
     guard_slm_ms = stage_lats.get("guard", 0.0)
@@ -448,7 +447,7 @@ async def process_chat(
     drag_ms = stage_lats.get("drag", 0.0)
     dola_ms = stage_lats.get("dola", 0.0)
     total_latency_ms = res["pipeline_trace"]["total_latency_ms"]
-    
+
     sanitizer_ms = stage_lats.get("sanitizer", 0.0)
     inference_ms = stage_lats.get("inference", 0.0)
     ttft_ms = sanitizer_ms + guard_slm_ms + ease_ms + (inference_ms * 0.1)
@@ -465,7 +464,7 @@ async def process_chat(
         "applied_cot": res["route"] == "COT",
         "blocked": res["blocked"]
     }
-    
+
     # Generate some mock token stats if dola is enabled to satisfy token bubble UI
     token_stats = []
     if req.enable_dola and not res["blocked"] and ctx.slm_response:
@@ -477,7 +476,7 @@ async def process_chat(
                 "contrasted_prob": random.uniform(0.7, 0.99) if idx % 4 != 0 else random.uniform(0.1, 0.6),
                 "adjusted_by_dola": idx % 4 == 0
             })
-            
+
     # Save assistant message to database
     assistant_msg_id = f"msg_{str(uuid.uuid4())[:8]}"
     new_assistant_msg = database.Message(
@@ -487,7 +486,7 @@ async def process_chat(
         text=res["response"],
         metrics=json.dumps(metrics),
         token_stats=json.dumps(token_stats),
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC)
     )
     db.add(new_assistant_msg)
 
@@ -501,16 +500,16 @@ async def process_chat(
         response=res["response"],
         metrics=json.dumps(metrics),
         token_stats=json.dumps(token_stats),
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC)
     )
     db.add(req_log)
-    
+
     # Log to ThreatEvent table if blocked
     if res["blocked"]:
         threat_type = "jailbreak"
         if "injection" in res["response"].lower() or "injection" in req.prompt.lower():
             threat_type = "injection"
-            
+
         threat_ev = database.ThreatEvent(
             id=str(uuid.uuid4()),
             user_id=user.id,
@@ -521,10 +520,10 @@ async def process_chat(
             guard_latency_ms=guard_slm_ms,
             blocked=True,
             metadata_json=json.dumps(metrics),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(UTC)
         )
         db.add(threat_ev)
-        
+
     db.commit()
 
     append_to_history(req.prompt, res["response"], metrics, token_stats)
@@ -556,7 +555,7 @@ async def list_templates(user = Depends(require_auth), db = Depends(database.get
     tpls = db.query(database.AgentTemplate).filter(
         (database.AgentTemplate.is_builtin == True) | (database.AgentTemplate.user_id == user.id)
     ).all()
-    
+
     result = []
     for t in tpls:
         try:
@@ -567,7 +566,7 @@ async def list_templates(user = Depends(require_auth), db = Depends(database.get
             sp = json.loads(t.suggested_prompts) if t.suggested_prompts else []
         except Exception:
             sp = []
-            
+
         result.append({
             "id": t.id,
             "name": t.name,
@@ -588,7 +587,7 @@ async def create_template(body: TemplateCreateRequest, user = Depends(require_au
     import uuid
     tpl_id = f"tpl_{str(uuid.uuid4())[:8]}"
     gc = body.guardrail_config or {"enable_guard": True, "enable_ease": True, "enable_drag": True, "enable_dola": True}
-    
+
     new_tpl = database.AgentTemplate(
         id=tpl_id,
         user_id=user.id,
@@ -604,7 +603,7 @@ async def create_template(body: TemplateCreateRequest, user = Depends(require_au
     db.add(new_tpl)
     db.commit()
     db.refresh(new_tpl)
-    
+
     return {
         "id": new_tpl.id,
         "name": new_tpl.name,
@@ -618,7 +617,7 @@ async def update_template(template_id: str, body: TemplateCreateRequest, user = 
     tpl = db.query(database.AgentTemplate).filter_by(id=template_id, user_id=user.id).first()
     if not tpl:
         raise HTTPException(404, "Custom template not found")
-        
+
     tpl.name = body.name
     tpl.description = body.description
     tpl.system_prompt = body.system_prompt
@@ -627,7 +626,7 @@ async def update_template(template_id: str, body: TemplateCreateRequest, user = 
     if body.guardrail_config:
         tpl.guardrail_config = json.dumps(body.guardrail_config)
     tpl.suggested_prompts = json.dumps(body.suggested_prompts)
-    
+
     db.commit()
     return {"message": "Template updated"}
 
@@ -637,7 +636,7 @@ async def delete_template(template_id: str, user = Depends(require_auth), db = D
     tpl = db.query(database.AgentTemplate).filter_by(id=template_id, user_id=user.id).first()
     if not tpl:
         raise HTTPException(404, "Custom template not found")
-        
+
     db.delete(tpl)
     db.commit()
     return {"message": "Template deleted"}
@@ -664,7 +663,7 @@ async def import_memories(request: Request, user = Depends(require_auth), db = D
         raise HTTPException(400, "Markdown file is required")
     contents = await file.read()
     md_content = contents.decode("utf-8")
-    
+
     count = memory_sys.import_memories_markdown(db, user.id, md_content)
     return {"message": f"Successfully imported {count} memories"}
 
@@ -677,9 +676,9 @@ async def list_memories(template_id: str | None = None, user = Depends(require_a
     )
     if template_id:
         query = query.filter(database.Memory.template_id == template_id)
-        
+
     memories = query.order_by(database.Memory.created_at.desc()).all()
-    
+
     return [
         {
             "id": m.id,
@@ -714,12 +713,12 @@ async def update_memory(memory_id: str, body: MemoryUpdateRequest, user = Depend
     m = db.query(database.Memory).filter_by(id=memory_id, user_id=user.id).first()
     if not m:
         raise HTTPException(404, "Memory not found")
-        
+
     if body.content is not None:
         m.content = body.content
     if body.importance is not None:
         m.importance = body.importance
-        
+
     db.commit()
     return {"message": "Memory updated"}
 
@@ -729,7 +728,7 @@ async def delete_memory(memory_id: str, user = Depends(require_auth), db = Depen
     m = db.query(database.Memory).filter_by(id=memory_id, user_id=user.id).first()
     if not m:
         raise HTTPException(404, "Memory not found")
-        
+
     m.is_active = False  # Soft delete
     db.commit()
     return {"message": "Memory deleted"}
@@ -743,7 +742,7 @@ async def list_conversations(user = Depends(require_auth), db = Depends(database
     convs = db.query(database.Conversation).filter_by(user_id=user.id).order_by(
         database.Conversation.pinned.desc(), database.Conversation.updated_at.desc()
     ).all()
-    
+
     return [
         {
             "id": c.id,
@@ -762,7 +761,7 @@ async def create_conversation(body: ConversationCreateRequest, user = Depends(re
     """Create a new conversation."""
     import uuid
     conv_id = f"conv_{str(uuid.uuid4())[:8]}"
-    
+
     new_conv = database.Conversation(
         id=conv_id,
         user_id=user.id,
@@ -773,7 +772,7 @@ async def create_conversation(body: ConversationCreateRequest, user = Depends(re
     db.add(new_conv)
     db.commit()
     db.refresh(new_conv)
-    
+
     return {
         "id": new_conv.id,
         "title": new_conv.title,
@@ -789,7 +788,7 @@ async def delete_conversation(conv_id: str, user = Depends(require_auth), db = D
     conv = db.query(database.Conversation).filter_by(id=conv_id, user_id=user.id).first()
     if not conv:
         raise HTTPException(404, "Conversation not found")
-        
+
     db.delete(conv)
     db.commit()
     return {"message": "Conversation deleted"}
@@ -800,9 +799,9 @@ async def get_conversation_messages(conv_id: str, user = Depends(require_auth), 
     conv = db.query(database.Conversation).filter_by(id=conv_id, user_id=user.id).first()
     if not conv:
         raise HTTPException(404, "Conversation not found")
-        
+
     messages = db.query(database.Message).filter_by(conversation_id=conv_id).order_by(database.Message.created_at.asc()).all()
-    
+
     result = []
     for m in messages:
         try:
@@ -813,7 +812,7 @@ async def get_conversation_messages(conv_id: str, user = Depends(require_auth), 
             ts = json.loads(m.token_stats) if m.token_stats else []
         except Exception:
             ts = []
-            
+
         result.append({
             "id": m.id,
             "sender": m.sender,

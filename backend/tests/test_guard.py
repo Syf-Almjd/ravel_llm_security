@@ -3,6 +3,7 @@ Unit tests for Stage 2: Guard (ML safety classifier & blocklist).
 """
 
 import pytest
+
 from pipeline import PipelineContext
 from pipeline.guard import Guard
 

@@ -5,18 +5,26 @@ Defines all tables and provides session management for the API.
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from sqlalchemy import (
-    create_engine, Column, String, Text, Boolean, Float, Integer,
-    DateTime, ForeignKey, Index, event
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    create_engine,
 )
-from sqlalchemy.orm import (
-    declarative_base, sessionmaker, scoped_session, relationship
-)
+from sqlalchemy.orm import declarative_base, relationship, scoped_session, sessionmaker
+
 
 def utc_now() -> datetime:
     """Return timezone-aware current UTC time."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 # ─── Database Path ───────────────────────────────────────────
 # We store the database file in backend/data/ravel.db

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ravel-security"
+version = "1.0.0"
+description = "Zero-Trust Runtime Security Gateway for LLM Agents and Small Language Models"
+authors = [{ name = "Ravel Contributors" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
+asyncio_mode = "strict"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "E402",  # module level import not at top of file (sys.path manipulation)
+    "E711",  # comparison to None (SQLAlchemy expressions require == None)
+    "E712",  # comparison to True/False (SQLAlchemy expressions require == True)
+    "B008",  # do not perform function calls in argument defaults (FastAPI Depends)
+    "B904",  # raise ... from err
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend", "pipeline", "telemetry", "config", "database", "middleware", "auth", "admin", "memory", "policy_engine"]

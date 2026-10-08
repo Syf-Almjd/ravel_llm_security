@@ -1,15 +1,24 @@
-version: "3.9"
-
 services:
   ravel:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - PORT=8000
+      - HOST=0.0.0.0
+    volumes:
+      - ravel_data:/app/backend/data
     depends_on:
       - ollama
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   ollama:
     image: ollama/ollama:latest
@@ -18,8 +27,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
-    # Pull the model on first run:
-    #   docker exec -it <container> ollama pull gemma3:1b
 
 volumes:
+  ravel_data:
   ollama_data:

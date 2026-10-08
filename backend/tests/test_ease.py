@@ -3,6 +3,7 @@ Unit tests for Stage 3: EASE (Adaptive Complexity Router).
 """
 
 import pytest
+
 from pipeline import PipelineContext
 from pipeline.ease import EASERouter
 

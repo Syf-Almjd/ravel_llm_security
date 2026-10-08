@@ -2,7 +2,6 @@
 Unit tests for Authentication, JWT, and User management.
 """
 
-from database import User
 from middleware import decode_jwt
 
 

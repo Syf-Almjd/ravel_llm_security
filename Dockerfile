@@ -1,34 +1,47 @@
-FROM python:3.11-slim
+# Stage 1: Build Nuxt 3 Frontend
+FROM node:22-slim AS frontend-builder
+WORKDIR /app/frontend
 
-# Install Node.js v22 (LTS) for Nuxt 4 / Vite 7 stability
-RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run generate
+
+# Stage 2: Production Backend Runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# 1. Build Frontend (Nuxt Static Generation)
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm install
-COPY frontend/ ./frontend/
-RUN cd frontend && npx nuxt generate
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 2. Setup Backend
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python requirements
+COPY backend/requirements.txt ./backend/
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+# Copy backend application source
 COPY backend/ ./backend/
 
-# Train the GUARD-SLM model
+# Copy compiled frontend from Stage 1
+COPY --from=frontend-builder /app/frontend/.output/public ./frontend/.output/public
+
+# Pre-train the GUARD ML model
 RUN cd backend && python scripts/train_guard.py
 
-# Seed ChromaDB
-RUN cd backend && python scripts/seed_chromadb.py
+# Create non-root user and persistent directories
+RUN useradd -m -u 1000 ravel && \
+    mkdir -p /app/backend/data && \
+    chown -R ravel:ravel /app
 
-# Keep root layout active for Coolify lifecycle checks
-WORKDIR /app
+USER ravel
 
 EXPOSE 8000
 
-# Start Uvicorn safely from inside the backend directory environment
-CMD ["sh", "-c", "cd backend && uvicorn app:app --host 0.0.0.0 --port 8000"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8000/api/health || exit 1
+
+WORKDIR /app/backend
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
