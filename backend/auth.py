@@ -6,7 +6,7 @@ All routes are prefixed with /api/auth.
 
 import uuid   # For generating unique user IDs
 import re     # For email validation regex
-from datetime import datetime
+from datetime import datetime, timezone
 
 import bcrypt  # For secure password hashing (industry standard)
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -36,10 +36,10 @@ class LoginRequest(BaseModel):
 
 
 class UpdateProfileRequest(BaseModel):
-    display_name: str = None
-    avatar_initials: str = None
-    current_password: str = None      # Required if changing password
-    new_password: str = None
+    display_name: str | None = None
+    avatar_initials: str | None = None
+    current_password: str | None = None      # Required if changing password
+    new_password: str | None = None
 
 
 class UserResponse(BaseModel):
@@ -144,8 +144,8 @@ async def register(body: RegisterRequest, request: Request, db: DBSession = Depe
         display_name=display_name,
         role=role,
         avatar_initials=initials[:2],
-        created_at=datetime.utcnow(),
-        last_login=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        last_login=datetime.now(timezone.utc),
     )
     db.add(user)
     db.commit()
@@ -185,7 +185,7 @@ async def login(body: LoginRequest, request: Request, db: DBSession = Depends(ge
         raise HTTPException(403, "Account has been suspended")
 
     # Update the last login timestamp
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
 
     # Generate a fresh JWT token for this session

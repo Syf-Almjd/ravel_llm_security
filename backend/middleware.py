@@ -8,15 +8,15 @@ import os
 import time
 import uuid
 import secrets  # For generating cryptographically secure random values
-from datetime import datetime, timedelta
-from functools import wraps
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt  # PyJWT — JSON Web Token library for creating/verifying tokens
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session as DBSession
 
-from database import get_db, User, Session as SessionModel
+from database import User, get_db
+from database import Session as SessionModel
 
 # ─── JWT Configuration ───────────────────────────────────────
 # JWT tokens are how we keep users logged in without storing passwords in cookies.
@@ -45,17 +45,18 @@ JWT_SECRET = _load_or_create_secret()
 
 # ─── JWT Token Operations ────────────────────────────────────
 
-def create_jwt(user_id: str, role: str) -> tuple[str, str]:
+def create_jwt(user_id: str, role: str) -> tuple[str, str, datetime]:
     """Create a signed JWT token for a user.
     Returns (token_string, unique_token_id, expiry_datetime)."""
     jti = str(uuid.uuid4())  # Unique ID for this token (used for revocation)
-    exp = datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS)
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(hours=JWT_EXPIRY_HOURS)
     payload = {
         "sub": user_id,       # "subject" — who this token belongs to
         "role": role,          # Their role (admin/user) — checked by require_admin
         "jti": jti,            # Unique token ID — checked during revocation
         "exp": exp,            # Expiry time — token is invalid after this
-        "iat": datetime.utcnow(),  # "issued at" — when was this token created
+        "iat": now,            # "issued at" — when was this token created
     }
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return token, jti, exp

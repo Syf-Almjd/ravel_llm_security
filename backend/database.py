@@ -5,7 +5,7 @@ Defines all tables and provides session management for the API.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     create_engine, Column, String, Text, Boolean, Float, Integer,
     DateTime, ForeignKey, Index, event
@@ -13,6 +13,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import (
     declarative_base, sessionmaker, scoped_session, relationship
 )
+
+def utc_now() -> datetime:
+    """Return timezone-aware current UTC time."""
+    return datetime.now(timezone.utc)
 
 # ─── Database Path ───────────────────────────────────────────
 # We store the database file in backend/data/ravel.db
@@ -53,7 +57,7 @@ class User(Base):
     role = Column(String, default="user")           # 'admin' | 'user'
     avatar_initials = Column(String(2))             # e.g. "SA"
     is_active = Column(Boolean, default=True)       # False = suspended/banned
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     last_login = Column(DateTime)
 
     # Relationships — these let us access related records easily
@@ -89,7 +93,7 @@ class AgentTemplate(Base):
     guardrail_config = Column(Text)                  # JSON — which pipeline stages are on/off
     suggested_prompts = Column(Text)                 # JSON array — starter prompts for this persona
     is_builtin = Column(Boolean, default=False)      # True = shipped with Ravel, not user-created
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 
 class Conversation(Base):
@@ -102,8 +106,8 @@ class Conversation(Base):
     title = Column(String, default="New Session")
     category = Column(String, default="General")
     pinned = Column(Boolean, default=False)           # User can pin important chats
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     user = relationship("User", back_populates="conversations")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan",
@@ -120,7 +124,7 @@ class Message(Base):
     text = Column(Text, nullable=False)               # The message content
     metrics = Column(Text)                            # JSON — security scores, latencies, etc.
     token_stats = Column(Text)                        # JSON — token counts for billing/monitoring
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     conversation = relationship("Conversation", back_populates="messages")
 
@@ -138,7 +142,7 @@ class Memory(Base):
     source_conversation_id = Column(String, nullable=True)  # Where this memory came from
     source_message_id = Column(String, nullable=True)
     importance = Column(Float, default=0.5)           # 0-1, higher = more important
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     last_accessed = Column(DateTime)                  # When was this memory last used
     access_count = Column(Integer, default=0)         # How many times it's been referenced
     is_active = Column(Boolean, default=True)         # False = soft-deleted
@@ -163,7 +167,7 @@ class ApiKey(Base):
     key_hash = Column(String, nullable=False)         # Hashed version of the key (we don't store raw keys)
     key_prefix = Column(String, nullable=False)       # First 7 chars for display (e.g. "rv_abc**")
     request_count = Column(Integer, default=0)        # How many times this key has been used
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     last_used = Column(DateTime)
     is_active = Column(Boolean, default=True)
 
@@ -184,7 +188,7 @@ class ThreatEvent(Base):
     guard_latency_ms = Column(Float)                  # How fast the guard caught it
     blocked = Column(Boolean, default=True)           # Was it blocked?
     metadata_json = Column(Text)                      # Full pipeline metrics as JSON
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     user = relationship("User", back_populates="threat_events")
 
@@ -207,7 +211,7 @@ class RequestLog(Base):
     response = Column(Text)                           # What the AI replied
     metrics = Column(Text)                            # JSON — all pipeline scores
     token_stats = Column(Text)                        # JSON — token usage stats
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     user = relationship("User", back_populates="request_logs")
 
@@ -226,7 +230,7 @@ class SystemSetting(Base):
 
     key = Column(String, primary_key=True)            # e.g. "security_policy"
     value = Column(Text)                              # JSON string with the setting value
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
 # ─── Database Initialization ─────────────────────────────────
