@@ -69,7 +69,7 @@ from admin import router as admin_router
 from middleware import require_auth, require_admin
 import memory as memory_sys
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ─── Pipeline Assembly ───────────────────────────────────────
@@ -202,12 +202,12 @@ class MemoryCreateRequest(BaseModel):
 
 
 class MemoryUpdateRequest(BaseModel):
-    content: str = None
-    importance: float = None
+    content: str | None = None
+    importance: float | None = None
 
 
 class ConversationCreateRequest(BaseModel):
-    template_id: str = None
+    template_id: str | None = None
     title: str = "New Session"
     category: str = "General"
 
@@ -219,7 +219,7 @@ class BenchmarkRequest(BaseModel):
 
 # ─── API Routes ──────────────────────────────────────────────
 
-def append_to_history(req_prompt: str, res_text: str, metrics: dict, token_stats: list = None):
+def append_to_history(req_prompt: str, res_text: str, metrics: dict, token_stats: list | None = None):
     """Helper to keep telemetry and request history logs updated."""
     telemetry_data.append(metrics)
     request_history.append({
@@ -414,7 +414,7 @@ async def process_chat(
         conversation_id=conversation_id,
         sender="user",
         text=req.prompt,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_user_msg)
     
@@ -422,7 +422,7 @@ async def process_chat(
     msg_count = db.query(func.count(database.Message.id)).filter_by(conversation_id=conversation_id).scalar() or 0
     if msg_count <= 1 or conv.title in ("New Session", "Initial Session", "New Security Session"):
         conv.title = req.prompt[:30] + "..." if len(req.prompt) > 30 else req.prompt
-    conv.updated_at = datetime.utcnow()
+    conv.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     # Map toggles to pipeline config
@@ -487,7 +487,7 @@ async def process_chat(
         text=res["response"],
         metrics=json.dumps(metrics),
         token_stats=json.dumps(token_stats),
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_assistant_msg)
 
@@ -501,7 +501,7 @@ async def process_chat(
         response=res["response"],
         metrics=json.dumps(metrics),
         token_stats=json.dumps(token_stats),
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(req_log)
     
@@ -521,7 +521,7 @@ async def process_chat(
             guard_latency_ms=guard_slm_ms,
             blocked=True,
             metadata_json=json.dumps(metrics),
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(threat_ev)
         
@@ -669,7 +669,7 @@ async def import_memories(request: Request, user = Depends(require_auth), db = D
     return {"message": f"Successfully imported {count} memories"}
 
 @app.get("/api/memories")
-async def list_memories(template_id: str = None, user = Depends(require_auth), db = Depends(database.get_db)):
+async def list_memories(template_id: str | None = None, user = Depends(require_auth), db = Depends(database.get_db)):
     """List user memories, optionally filtered by template_id."""
     query = db.query(database.Memory).filter(
         database.Memory.user_id == user.id,
@@ -826,7 +826,7 @@ async def get_conversation_messages(conv_id: str, user = Depends(require_auth), 
 
 
 @app.get("/api/health")
-async def health_check(ollama_endpoint: str = None):
+async def health_check(ollama_endpoint: str | None = None):
     """Health check endpoint."""
     import httpx
 
@@ -1005,27 +1005,28 @@ async def update_policy(req: PolicySaveRequest):
         return JSONResponse(status_code=400, content={"error": f"Invalid YAML configuration: {str(e)}"})
 
 
-# ─── Static Files (Frontend) ────────────────────────────────
+# ─── Static Files & SPA Fallback (Frontend) ────────────────
 
 nuxt_output_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../frontend/.output/public")
 )
+old_frontend_path = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), config.FRONTEND_DIR)
+)
 
-if os.path.exists(nuxt_output_path):
-    # Serve compiled Nuxt static assets (JS, CSS, Images)
-    app.mount("/", StaticFiles(directory=nuxt_output_path, html=True), name="frontend")
-    
-    # SPA Fallback handler for client-side routing routes
-    @app.exception_handler(404)
-    async def not_found_exception_handler(request, exc):
-        return FileResponse(os.path.join(nuxt_output_path, "index.html"))
-else:
-    @app.get("/")
-    async def fallback_status():
-        return {
-            "detail": f"Frontend index.html missing at expected path: {nuxt_output_path}. Check container build pipelines."
-        }
-        
+# Custom 404 handler that preserves JSON responses for all /api routes
+@app.exception_handler(404)
+async def not_found_exception_handler(request: Request, exc: Exception):
+    if request.url.path.startswith(("/api", "/api/")):
+        return JSONResponse(status_code=404, content={"detail": "API endpoint not found"})
+    index_path = os.path.join(nuxt_output_path, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    old_index = os.path.join(old_frontend_path, "index.html")
+    if os.path.exists(old_index):
+        return FileResponse(old_index)
+    return JSONResponse(status_code=404, content={"detail": "Page not found"})
+
 # Mount static files folder if it exists
 _nuxt_path = os.path.join(nuxt_output_path, "_nuxt")
 if os.path.exists(_nuxt_path):
@@ -1034,24 +1035,25 @@ if os.path.exists(_nuxt_path):
 @app.get("/{fallback_path:path}")
 async def serve_nuxt_spa(fallback_path: str):
     """Serve Nuxt static files or fallback to index.html for SPA client routing."""
-    if fallback_path.startswith("api/") or fallback_path.startswith("api"):
+    if fallback_path.startswith(("api/", "api")):
         raise HTTPException(status_code=404, detail="API endpoint not found")
-        
+
     local_file = os.path.join(nuxt_output_path, fallback_path)
     if os.path.exists(local_file) and os.path.isfile(local_file):
         return FileResponse(local_file)
-        
+
     index_path = os.path.join(nuxt_output_path, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-        
-    # Fallback to the old frontend path if Nuxt output is not generated yet
-    old_frontend_path = os.path.join(os.path.dirname(__file__), config.FRONTEND_DIR)
+
     old_index = os.path.join(old_frontend_path, "index.html")
     if os.path.exists(old_index):
         return FileResponse(old_index)
-        
-    raise HTTPException(status_code=404, detail="Frontend index.html not found. Run Nuxt static generation.")
+
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Frontend assets not found. Run static generation."}
+    )
 
 
 

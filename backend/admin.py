@@ -5,7 +5,7 @@ All routes require admin role.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
@@ -46,8 +46,7 @@ async def get_admin_stats(
     ).order_by(desc("count")).limit(10).all()
 
     # Recent registrations (last 7 days)
-    from datetime import timedelta
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     new_users_this_week = db.query(func.count(User.id)).filter(
         User.created_at >= week_ago
     ).scalar() or 0
@@ -343,11 +342,12 @@ async def update_system_settings(
             continue  # Ignore unknown keys
 
         row = db.query(SystemSetting).filter_by(key=key).first()
+        now = datetime.now(timezone.utc)
         if row:
             row.value = str(value)
-            row.updated_at = datetime.utcnow()
+            row.updated_at = now
         else:
-            row = SystemSetting(key=key, value=str(value), updated_at=datetime.utcnow())
+            row = SystemSetting(key=key, value=str(value), updated_at=now)
             db.add(row)
 
     db.commit()

@@ -20,7 +20,7 @@ Memory lifecycle:
 import uuid
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -153,7 +153,7 @@ def retrieve_memories(
 
     # Update access tracking (for analytics and memory decay)
     for m in memories:
-        m.last_accessed = datetime.utcnow()
+        m.last_accessed = datetime.now(timezone.utc)
         m.access_count = (m.access_count or 0) + 1
     db.commit()
 
@@ -200,7 +200,7 @@ def save_memory(
         source_conversation_id=conversation_id,
         source_message_id=message_id,
         importance=importance,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(memory)
     db.commit()
@@ -261,7 +261,7 @@ def export_memories_markdown(db: DBSession, user_id: str, user_email: str = "") 
     lines = [
         "# Ravel Agent Memory Export",
         f"## User: {user_email}",
-        f"## Exported: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+        f"## Exported: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
         f"## Total Memories: {len(memories)}",
         "",
     ]
