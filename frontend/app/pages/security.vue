@@ -56,7 +56,7 @@
               <tr v-for="t in filteredThreats" :key="t.timestamp">
                 <td class="mono text-muted">{{ formatTime(t.timestamp) }}</td>
                 <td class="prompt-text-column" :title="t.prompt">{{ t.prompt }}</td>
-                <td class="mono">{{ t.metrics.guard_slm_ms.toFixed(1) }} ms</td>
+                <td class="mono">{{ (t.metrics?.guard_slm_ms ?? 0).toFixed(1) }} ms</td>
                 <td><span class="badge badge-danger">Critical</span></td>
                 <td><span class="badge badge-danger">Blocked</span></td>
               </tr>
@@ -93,15 +93,15 @@
                 <td class="mono text-muted">{{ formatTime(r.timestamp) }}</td>
                 <td class="prompt-text-column" :title="r.prompt">{{ r.prompt }}</td>
                 <td>
-                  <span :class="['badge', r.metrics.blocked ? 'badge-danger' : r.metrics.applied_cot ? 'badge-warning' : 'badge-success']">
-                    {{ r.metrics.blocked ? 'Blocked' : r.metrics.applied_cot ? 'Chain-of-Thought' : 'Direct' }}
+                  <span :class="['badge', r.metrics?.blocked ? 'badge-danger' : r.metrics?.applied_cot ? 'badge-warning' : 'badge-success']">
+                    {{ r.metrics?.blocked ? 'Blocked' : r.metrics?.applied_cot ? 'Chain-of-Thought' : 'Direct' }}
                   </span>
                 </td>
-                <td class="mono">{{ r.metrics.blocked ? '--' : `${r.metrics.total_latency_ms.toFixed(0)} ms` }}</td>
-                <td class="mono font-semibold">{{ r.metrics.blocked ? '--' : r.metrics.ris_score.toFixed(2) }}</td>
+                <td class="mono">{{ r.metrics?.blocked ? '--' : `${(r.metrics?.total_latency_ms ?? 0).toFixed(0)} ms` }}</td>
+                <td class="mono font-semibold">{{ r.metrics?.blocked ? '--' : (r.metrics?.ris_score ?? 0).toFixed(2) }}</td>
                 <td>
-                  <span :class="['badge', r.metrics.blocked ? 'badge-danger' : 'badge-success']">
-                    {{ r.metrics.blocked ? 'Deflected' : 'Passed' }}
+                  <span :class="['badge', r.metrics?.blocked ? 'badge-danger' : 'badge-success']">
+                    {{ r.metrics?.blocked ? 'Deflected' : 'Passed' }}
                   </span>
                 </td>
                 <td class="text-right">
@@ -256,7 +256,7 @@ onMounted(async () => {
 })
 
 const blockedHistory = computed(() => {
-  return history.value.filter(r => r.metrics.blocked)
+  return history.value.filter(r => r.metrics?.blocked)
 })
 
 const filteredThreats = computed(() => {
@@ -276,12 +276,12 @@ const filteredRequests = computed(() => {
 // Metrics summary calculations
 const totalQueriesCount = computed(() => history.value.length)
 const avgLatency = computed(() => {
-  const active = history.value.filter(r => !r.metrics.blocked)
-  return active.length > 0 ? active.reduce((sum, r) => sum + r.metrics.total_latency_ms, 0) / active.value || active.reduce((sum, r) => sum + r.metrics.total_latency_ms, 0) / active.length : 0
+  const active = history.value.filter(r => !r.metrics?.blocked)
+  return active.length > 0 ? active.reduce((sum, r) => sum + (r.metrics?.total_latency_ms || 0), 0) / active.length : 0
 })
 const cotRatio = computed(() => {
-  const active = history.value.filter(r => !r.metrics.blocked)
-  const cot = active.filter(r => r.metrics.applied_cot)
+  const active = history.value.filter(r => !r.metrics?.blocked)
+  const cot = active.filter(r => r.metrics?.applied_cot)
   return active.length > 0 ? (cot.length / active.length) * 100 : 0
 })
 
@@ -338,9 +338,9 @@ const generateReport = () => {
     dataToExport.forEach(r => {
       const time = new Date(r.timestamp).toISOString()
       const promptEsc = `"${r.prompt.replace(/"/g, '""')}"`
-      const blocked = r.metrics.blocked ? "TRUE" : "FALSE"
-      const latency = r.metrics.blocked ? "" : r.metrics.total_latency_ms.toFixed(0)
-      const ris = r.metrics.blocked ? "" : r.metrics.ris_score.toFixed(2)
+      const blocked = r.metrics?.blocked ? "TRUE" : "FALSE"
+      const latency = r.metrics?.blocked ? "" : (r.metrics?.total_latency_ms ?? 0).toFixed(0)
+      const ris = r.metrics?.blocked ? "" : (r.metrics?.ris_score ?? 0).toFixed(2)
       csvContent += `${time},${promptEsc},${blocked},${latency},${ris}\n`
     })
     const encodedUri = encodeURI(csvContent)

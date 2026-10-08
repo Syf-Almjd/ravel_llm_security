@@ -67,7 +67,7 @@
               <span :class="['badge', getTypeBadgeClass(m.memory_type)]">{{ m.memory_type }}</span>
             </td>
             <td class="memory-content-cell">{{ m.content }}</td>
-            <td class="mono font-semibold">{{ (m.importance * 100).toFixed(0) }}%</td>
+            <td class="mono font-semibold">{{ ((m.importance ?? 0) * 100).toFixed(0) }}%</td>
             <td class="text-muted text-small">{{ formatDate(m.created_at) }}</td>
             <td class="text-right">
               <div class="action-buttons">
@@ -99,7 +99,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Importance Level: {{ (editForm.importance * 100).toFixed(0) }}%</label>
+            <label class="form-label">Importance Level: {{ ((editForm.importance ?? 0) * 100).toFixed(0) }}%</label>
             <input v-model.number="editForm.importance" type="range" min="0" max="1" step="0.05" class="slider-input" />
           </div>
 
