@@ -216,7 +216,10 @@ async def logout(request: Request, user: User = Depends(require_auth), db: DBSes
                 session = db.query(SessionModel).filter_by(token_jti=jti).first()
                 if session:
                     session.revoked = True
-                    db.commit()
+                else:
+                    session = SessionModel(token_jti=jti, user_id=user.id, revoked=True)
+                    db.add(session)
+                db.commit()
         except Exception:
             pass  # If decoding fails, just say logout succeeded anyway
 
