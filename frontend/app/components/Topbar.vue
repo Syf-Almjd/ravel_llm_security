@@ -18,7 +18,7 @@
       <!-- Latency Indicator -->
       <div class="latency-indicator" title="Last measured roundtrip network latency to LLM">
         <span class="latency-label">RTT:</span>
-        <span class="latency-val">{{ lastRtt ? `${lastRtt.toFixed(0)} ms` : '-- ms' }}</span>
+        <span class="latency-val">{{ lastRtt != null && !isNaN(lastRtt) ? `${Number(lastRtt).toFixed(0)} ms` : '-- ms' }}</span>
       </div>
 
  

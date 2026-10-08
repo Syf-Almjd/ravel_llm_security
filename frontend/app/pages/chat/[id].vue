@@ -71,7 +71,7 @@
                       </div>
                       <div class="diag-detail-item">
                         <span class="diag-detail-label">Factual Score (RIS):</span>
-                        <span class="diag-detail-val mono text-success font-semibold">{{ msg.metrics.ris_score.toFixed(2) }}</span>
+                        <span class="diag-detail-val mono text-success font-semibold">{{ (msg.metrics.ris_score ?? 0).toFixed(2) }}</span>
                       </div>
                     </div>
                     <div class="diag-col border-left">
@@ -114,7 +114,7 @@
                             :class="['dola-token', { adjusted: t.adjusted_by_dola }]"
                             :title="t.adjusted_by_dola ? 'Adjusted by DoLa contrasting layers' : 'Factual token'">
                         <span class="tok-txt font-semibold">{{ t.token }}</span>
-                        <span class="dola-prob mono">{{ t.contrasted_prob.toFixed(2) }}</span>
+                        <span class="dola-prob mono">{{ (t.contrasted_prob ?? 0).toFixed(2) }}</span>
                       </span>
                     </div>
                   </div>
@@ -343,7 +343,8 @@ const handleFormSubmit = async () => {
 }
 
 const parseMarkdown = (text) => {
-  return marked.parse(text)
+  if (!text) return ''
+  return marked.parse(String(text))
 }
 
 const formatMsgTime = (ts) => {

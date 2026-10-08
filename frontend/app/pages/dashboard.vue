@@ -199,8 +199,8 @@
                 <tr v-for="r in recentRequests" :key="r.timestamp">
                   <td class="mono text-muted">{{ formatTime(r.timestamp) }}</td>
                   <td class="text-truncate-cell" :title="r.prompt">{{ r.prompt }}</td>
-                  <td class="mono">{{ r.metrics.blocked ? '--' : `${r.metrics.total_latency_ms.toFixed(0)} ms` }}</td>
-                  <td class="mono font-semibold">{{ r.metrics.blocked ? '--' : r.metrics.ris_score.toFixed(2) }}</td>
+                  <td class="mono">{{ r.metrics?.blocked ? '--' : `${(r.metrics?.total_latency_ms ?? 0).toFixed(0)} ms` }}</td>
+                  <td class="mono font-semibold">{{ r.metrics?.blocked ? '--' : (r.metrics?.ris_score ?? 0).toFixed(2) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -227,25 +227,25 @@ const telemetry = ref({})
 
 // Calculated computed metrics
 const totalRequests = computed(() => history.value.length)
-const blockedRequests = computed(() => history.value.filter(r => r.metrics.blocked).length)
+const blockedRequests = computed(() => history.value.filter(r => r.metrics?.blocked).length)
 const blockRate = computed(() => totalRequests.value > 0 ? (blockedRequests.value / totalRequests.value) * 100 : 0)
 
-const activeRequests = computed(() => history.value.filter(r => !r.metrics.blocked))
+const activeRequests = computed(() => history.value.filter(r => !r.metrics?.blocked))
 const avgLatency = computed(() => activeRequests.value.length > 0
-  ? activeRequests.value.reduce((sum, r) => sum + r.metrics.total_latency_ms, 0) / activeRequests.value.length
+  ? activeRequests.value.reduce((sum, r) => sum + (r.metrics?.total_latency_ms || 0), 0) / activeRequests.value.length
   : 0
 )
 
 const avgRis = computed(() => activeRequests.value.length > 0
-  ? activeRequests.value.reduce((sum, r) => sum + r.metrics.ris_score, 0) / activeRequests.value.length
+  ? activeRequests.value.reduce((sum, r) => sum + (r.metrics?.ris_score || 0), 0) / activeRequests.value.length
   : 0
 )
 
-const directRouteCount = computed(() => history.value.filter(r => !r.metrics.blocked && !r.metrics.applied_cot).length)
-const cotRouteCount = computed(() => history.value.filter(r => !r.metrics.blocked && r.metrics.applied_cot).length)
+const directRouteCount = computed(() => history.value.filter(r => !r.metrics?.blocked && !r.metrics?.applied_cot).length)
+const cotRouteCount = computed(() => history.value.filter(r => !r.metrics?.blocked && r.metrics?.applied_cot).length)
 
 const recentThreats = computed(() => history.value
-  .filter(r => r.metrics.blocked)
+  .filter(r => r.metrics?.blocked)
   .slice(-5)
   .reverse()
 )
@@ -309,7 +309,7 @@ const drawChart = () => {
     return
   }
 
-  const maxVal = Math.max(100, ...plotItems.map(item => item.metrics.total_latency_ms))
+  const maxVal = Math.max(100, ...plotItems.map(item => item.metrics?.total_latency_ms || 0))
   const stepX = plotItems.length > 1 ? w / (plotItems.length - 1) : w
 
   // Draw grid
@@ -345,7 +345,8 @@ const drawChart = () => {
   ctx.beginPath()
   plotItems.forEach((item, index) => {
     const x = padLeft + index * stepX
-    const y = padTop + h - (item.metrics.total_latency_ms / maxVal) * h
+    const lat = item.metrics?.total_latency_ms || 0
+    const y = padTop + h - (lat / maxVal) * h
     if (index === 0) {
       ctx.moveTo(x, y)
     } else {
