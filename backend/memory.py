@@ -231,6 +231,7 @@ def save_extracted_memories(
         if content.lower() in existing_contents:
             continue  # Skip duplicate — we already know this
 
+        existing_contents.add(content.lower())
         save_memory(
             db=db,
             user_id=user_id,
