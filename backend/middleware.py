@@ -5,18 +5,17 @@ This is the "gatekeeper" — it checks who you are before letting you access rou
 """
 
 import os
+import secrets  # For generating cryptographically secure random values
 import time
 import uuid
-import secrets  # For generating cryptographically secure random values
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import jwt  # PyJWT — JSON Web Token library for creating/verifying tokens
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session as DBSession
 
-from database import User, get_db
 from database import Session as SessionModel
+from database import User, get_db
 
 # ─── JWT Configuration ───────────────────────────────────────
 # JWT tokens are how we keep users logged in without storing passwords in cookies.
@@ -32,7 +31,7 @@ def _load_or_create_secret():
     """Load the signing secret from file, or generate a new one if it doesn't exist."""
     os.makedirs(os.path.dirname(SECRET_KEY_PATH), exist_ok=True)
     if os.path.exists(SECRET_KEY_PATH):
-        with open(SECRET_KEY_PATH, "r") as f:
+        with open(SECRET_KEY_PATH) as f:
             return f.read().strip()
     # First run — generate a random 64-character hex string as the secret
     secret = secrets.token_hex(32)
@@ -49,7 +48,7 @@ def create_jwt(user_id: str, role: str) -> tuple[str, str, datetime]:
     """Create a signed JWT token for a user.
     Returns (token_string, unique_token_id, expiry_datetime)."""
     jti = str(uuid.uuid4())  # Unique ID for this token (used for revocation)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(hours=JWT_EXPIRY_HOURS)
     payload = {
         "sub": user_id,       # "subject" — who this token belongs to
@@ -86,17 +85,17 @@ def check_rate_limit(ip: str):
     now = time.time()
     if ip not in _rate_limit_store:
         _rate_limit_store[ip] = []
-    
+
     # Remove timestamps older than our window (keep only recent attempts)
     _rate_limit_store[ip] = [t for t in _rate_limit_store[ip] if now - t < RATE_LIMIT_WINDOW]
-    
+
     # If they've hit the limit, block them
     if len(_rate_limit_store[ip]) >= RATE_LIMIT_MAX:
         raise HTTPException(
             status_code=429,
             detail="Too many authentication attempts. Try again in 60 seconds."
         )
-    
+
     # Record this attempt
     _rate_limit_store[ip].append(now)
 
@@ -104,52 +103,52 @@ def check_rate_limit(ip: str):
 # ─── FastAPI Dependencies ────────────────────────────────────
 # These are used as `Depends()` in route handlers to enforce auth.
 
-def _extract_token(request: Request) -> Optional[str]:
+def _extract_token(request: Request) -> str | None:
     """Pull the JWT from the Authorization header or a cookie."""
     # Check Authorization header first (standard API approach)
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         return auth_header[7:]  # Strip "Bearer " to get just the token
-    
+
     # Fallback: check cookie (for browser-based sessions)
     token = request.cookies.get("ravel_token")
     if token:
         return token
-    
+
     return None
 
 
 async def get_current_user(
     request: Request,
     db: DBSession = Depends(get_db),
-) -> Optional[User]:
+) -> User | None:
     """Extract JWT from request, validate it, and return the User object.
     Returns None if no valid token found (does NOT raise an error).
     Use this for optional auth — routes that work with or without login."""
     token = _extract_token(request)
     if not token:
         return None
-    
+
     try:
         payload = decode_jwt(token)
     except HTTPException:
         return None
-    
+
     user_id = payload.get("sub")
     jti = payload.get("jti")
     if not user_id:
         return None
-    
+
     # Check if this token was revoked (e.g. user logged out)
     session = db.query(SessionModel).filter_by(token_jti=jti).first()
     if session and session.revoked:
         return None
-    
+
     # Look up the user and make sure they're not banned
     user = db.query(User).filter_by(id=user_id).first()
     if not user or not user.is_active:
         return None
-    
+
     return user
 
 

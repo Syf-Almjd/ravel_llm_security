@@ -4,17 +4,18 @@ Handles user registration, login, logout, and profile updates.
 All routes are prefixed with /api/auth.
 """
 
-import uuid   # For generating unique user IDs
-import re     # For email validation regex
-from datetime import datetime, timezone
+import re  # For email validation regex
+import uuid  # For generating unique user IDs
+from datetime import UTC, datetime
 
 import bcrypt  # For secure password hashing (industry standard)
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from database import get_db, User, Session as SessionModel
-from middleware import create_jwt, check_rate_limit, require_auth
+from database import Session as SessionModel
+from database import User, get_db
+from middleware import check_rate_limit, create_jwt, require_auth
 
 # This groups all auth routes under /api/auth/*
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -144,8 +145,8 @@ async def register(body: RegisterRequest, request: Request, db: DBSession = Depe
         display_name=display_name,
         role=role,
         avatar_initials=initials[:2],
-        created_at=datetime.now(timezone.utc),
-        last_login=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        last_login=datetime.now(UTC),
     )
     db.add(user)
     db.commit()
@@ -185,7 +186,7 @@ async def login(body: LoginRequest, request: Request, db: DBSession = Depends(ge
         raise HTTPException(403, "Account has been suspended")
 
     # Update the last login timestamp
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.now(UTC)
     db.commit()
 
     # Generate a fresh JWT token for this session

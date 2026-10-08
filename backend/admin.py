@@ -4,16 +4,22 @@ System-wide visibility and management endpoints.
 All routes require admin role.
 """
 
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session as DBSession
-from sqlalchemy import func, desc
 
 from database import (
-    get_db, User, Conversation, Message, Memory,
-    ApiKey, ThreatEvent, RequestLog, SystemSetting,
+    ApiKey,
+    Conversation,
+    Memory,
+    Message,
+    RequestLog,
+    SystemSetting,
+    ThreatEvent,
+    User,
+    get_db,
 )
 from middleware import require_admin
 
@@ -46,7 +52,7 @@ async def get_admin_stats(
     ).order_by(desc("count")).limit(10).all()
 
     # Recent registrations (last 7 days)
-    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    week_ago = datetime.now(UTC) - timedelta(days=7)
     new_users_this_week = db.query(func.count(User.id)).filter(
         User.created_at >= week_ago
     ).scalar() or 0
@@ -342,7 +348,7 @@ async def update_system_settings(
             continue  # Ignore unknown keys
 
         row = db.query(SystemSetting).filter_by(key=key).first()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if row:
             row.value = str(value)
             row.updated_at = now

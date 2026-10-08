@@ -3,6 +3,7 @@ Unit tests for Stage 7: RIS (Reasoning Integrity Score).
 """
 
 import pytest
+
 from pipeline import PipelineContext
 from pipeline.ris import RISScorer
 

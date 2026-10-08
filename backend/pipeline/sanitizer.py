@@ -22,8 +22,9 @@ and never reaches the AI model.
 """
 
 import re
-from pipeline import PipelineContext
+
 import config
+from pipeline import PipelineContext
 
 # ── Dangerous Unicode ranges ────────────────────────────────
 # These are invisible characters that attackers use to hide instructions.

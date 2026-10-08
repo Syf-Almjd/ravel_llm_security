@@ -12,8 +12,7 @@ Every time a query goes through the pipeline, record_query() is called
 to update all these metrics.
 """
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
-import config
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 # ─── Prometheus Counters (ever-increasing totals) ───────────
 REQUESTS_TOTAL = Counter(
@@ -72,7 +71,7 @@ _stats = {
 
 def record_query(pipeline_context):
     """Record all metrics from a completed pipeline run.
-    
+
     Called after every query to update:
     - Prometheus counters/histograms (for Grafana)
     - In-memory dashboard stats (for the admin UI)

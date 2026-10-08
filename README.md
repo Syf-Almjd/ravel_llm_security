@@ -1,172 +1,196 @@
-# Ravel: Runtime Security Platform for AI Agents
+# Ravel: Enterprise Zero-Trust Security Gateway for LLM Agents
 
-> **Protect agents, tools, memory, RAG, and workflows. Not just prompts.**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/Syf-Almjd/ravel_llm_security/actions/workflows/ci.yml/badge.svg)](https://github.com/Syf-Almjd/ravel_llm_security/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Nuxt 3 / Vue 3](https://img.shields.io/badge/frontend-Nuxt%203%20%7C%20Vue%203-00DC82.svg)](https://nuxt.com/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-Ravel is an runtime security platform designed specifically to secure Small Language Models (SLMs) and AI agents without destroying their latency advantages. Instead of statically applying heavy safety checks to every single query (which destroys baseline SLM latency), Ravel dynamically routes queries through only the safety layers they need using selective compute.
+> **Protect agents, tools, memory, RAG, and execution workflows — without sacrificing Small Language Model (SLM) latency.**
+
+Ravel is an enterprise-grade runtime security platform designed specifically to safeguard autonomous AI agents and Small Language Models (SLMs). Traditional AI guardrails rely on secondary LLMs (LLM-as-a-judge) that introduce 200–500ms of latency, wiping out the speed advantage of SLMs. 
+
+Ravel solves this through **Selective Compute Defense-in-Depth**: an ultra-fast, multi-stage pipeline that applies sub-millisecond heuristics and calibrated machine learning classifiers, conditionally invoking deep reasoning (Chain-of-Thought) and contrastive layer decoding (DoLa) only when risk or query complexity demands it.
+
+---
+
+## 🛡️ Architecture & Pipeline Flow
+
+```mermaid
+flowchart LR
+    A[User Query] --> B[Sanitizer <1ms]
+    B --> C[GUARD-SLM <5ms]
+    C -->|Blocked| Z[Deflected Response]
+    C -->|Safe| D[EASE Router <2ms]
+    D -->|Direct / CoT| E[D-RAG Retrieval <15ms]
+    E --> F[SLM Inference]
+    F --> G[DoLa Contrasting <3ms]
+    G --> H[RIS Validation <3ms]
+    H --> I[Verified Output]
+```
+
+### Defense-in-Depth Pipeline Layers
+
+| Stage | Component | Technical Mechanism | Latency SLA |
+|---|---|---|---|
+| **1** | **Sanitizer** | Strips zero-width Unicode characters, normalizes Cyrillic/Greek homoglyphs, defuses hidden markdown payloads. | `< 1 ms` |
+| **2** | **GUARD-SLM** | Calibrated Linear Support Vector Classifier (`LinearSVC` + `CalibratedClassifierCV`) on TF-IDF features with exact keyword blocklisting. | `< 5 ms` |
+| **3** | **EASE Router** | Entropy-Aware Selective Execution routing benign/simple queries directly and complex reasoning queries to Chain-of-Thought (CoT). | `< 2 ms` |
+| **4** | **D-RAG** | Distilled Retrieval-Augmented Generation with semantic relevance thresholding against ChromaDB vector embeddings. | `< 15 ms` |
+| **5** | **Inference Engine** | Low-latency local or remote inference loop (Ollama, vLLM, or custom endpoint). | Model dependent |
+| **6** | **DoLa Decoder** | Decoding by Contrasting Layers — contrasts mature vs. intermediate layers to reduce factual hallucinations. | `< 3 ms` |
+| **7** | **RIS Evaluator** | Reasoning Integrity Score computing semantic entailment, constraint fulfillment, and factuality (0.00–1.00). | `< 3 ms` |
+
+---
+
+## ✨ Enterprise Features
+
+- **Long-Term Agent Memory Bank**: Semantic vector memory with intra-batch deduplication, importance weighting (0.0–1.0), and portable Markdown export/import.
+- **Enterprise RBAC & Auth**: Secure JWT-based authentication with cryptographic JTI session tracking, user roles (`admin` vs. `user`), and zero-trust instant session revocation.
+- **Dynamic Policy Hot-Reloading**: YAML-driven security policies (`policies/default.yaml`) hot-reloaded at runtime without container restarts.
+- **Real-Time Telemetry & Observability**: Integrated Prometheus metrics endpoint (`/metrics`) and live forensic transaction inspector tracking end-to-end RTT, TTFT, and threat deflection stats.
+- **Modern Nuxt 3 SPA**: Reactive glassmorphism dashboard with threat analytics maps, dynamic canvas latency charts, persona templates, and security logs.
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option A: Docker Compose (Recommended)
 
-- **Python 3.11+**
-- **Ollama** — [Install here](https://ollama.com/download)
-
-### 1. Pull the Default SLM and init venv
+Run the entire stack (Ravel Gateway + Ollama) with a single command:
 
 ```bash
-ollama pull gemma3:1b
+docker compose up -d --build
+```
+
+Access the web interface at **`http://localhost:8000`**.
+
+Pull an SLM model into the Ollama container:
+```bash
+docker compose exec ollama ollama pull gemma3:1b
+```
+
+---
+
+### Option B: Local Development Setup
+
+#### 1. Prerequisites
+- **Python 3.11+**
+- **Node.js 20+** and **npm**
+- **Ollama** ([Download](https://ollama.com/download))
+
+#### 2. Backend Setup
+```bash
+# Clone the repository
+git clone https://github.com/Syf-Almjd/ravel_llm_security.git
+cd ravel_llm_security
+
+# Create and activate virtual environment
 python3.11 -m venv .venv
 source .venv/bin/activate
+
+# Install dependencies
+pip install -r backend/requirements.txt
+pip install pytest pytest-asyncio httpx ruff
+
+# Train Guard Classifier & Seed Vector DB
+python backend/scripts/train_guard.py
+python backend/scripts/seed_chromadb.py
+python backend/scripts/generate_templates.py
+
+# Launch FastAPI server
+cd backend
+uvicorn app:app --reload --port 8000
 ```
 
-### 2. Install Dependencies
+#### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+
+# For local development with hot-reload
+npm run dev -- --port 3000
+
+# Or compile static production assets for FastAPI
+npm run generate
+```
+
+---
+
+## 🧪 Testing & Code Quality
+
+Ravel maintains 100% passing automated test coverage across authentication, memory persistence, pipeline components, and REST endpoints:
 
 ```bash
-cd ravel/backend
-pip install -r requirements.txt
-```
+# Run backend test suite (37 tests with isolated SQLite fixtures)
+pytest backend/tests/ -v
 
-### 3. Train the GUARD-SLM Classifier
+# Run Python linting and code style verification
+ruff check backend/
 
-```bash
-python scripts/train_guard.py
-```
-
-### 4. Seed the Knowledge Base
-
-```bash
-python scripts/seed_chromadb.py
-python scripts/generate_templates.py
-```
-
-### 5. Start the Server
-
-```bash
-python app.py
-```
-
-Open **http://localhost:8000** in your browser.
-
----
-
-## 🛡 Security Architecture
-
-```
-Query ➔ Sanitizer ➔ GUARD ➔ EASE Router ➔ DRAG (RAG) ➔ SLM ➔ DoLa ➔ RIS ➔ Response
-         (1ms)       (3ms)     (2ms)          (15ms)      (var)   (3ms)  (2ms)
-```
-
-### Pipeline Steps
-
-| Step | Component | Purpose | Target Latency |
-|------|-----------|---------|----------------|
-| 1 | **Sanitizer** | Unicode normalization & script tag stripping | < 1ms |
-| 2 | **GUARD-SLM** | Keyword blocklist & SVM activation classifier | < 5ms |
-| 3 | **EASE** | Entropy-Aware Selective Routing (Direct vs. CoT) | < 2ms |
-| 4 | **DRAG** | Distilled RAG with compressed fact-cards | < 15ms |
-| 5 | **Inference** | SLM generation loop via Ollama | Variable |
-| 6 | **DoLa** | Contrastive layer decoding to check truthfulness | < 3ms |
-| 7 | **RIS** | Reasoning Integrity Score validation (0.00-1.00) | < 3ms |
-
----
-
-## ⚡ API Reference
-
-Ravel is designed to support a hybrid SaaS structure where the security policy plane is centralized, but inference execution endpoints (e.g. Ollama) can run on client localhost. All main endpoints accept connection configurations in the request body.
-
-| Method | Endpoint | Request Fields | Description |
-|--------|----------|----------------|-------------|
-| POST | `/api/chat` | `prompt`, `ollama_endpoint`, `model_name`, `enable_guard` | Main interactive chat route with custom toggle flags |
-| POST | `/api/query` | `query`, `ollama_endpoint`, `model_name`, `bypass_guard` | Synchronous prompt execution route |
-| POST | `/api/query/raw` | `query`, `ollama_endpoint`, `model_name` | Raw prompt execution bypassing guardrails |
-| GET | `/api/health` | None | Service health status and Ollama availability |
-| GET | `/api/telemetry` | None | Platform performance and latency telemetry list |
-| GET | `/api/requests/history` | None | Transaction request logs list |
-| GET | `/api/metrics` | None | Aggregated dashboard stats |
-| POST | `/api/benchmark` | `suite` | Run automated Red-Team test suite |
-| POST | `/api/reset` | None | Clear platform telemetry & request history |
-
-### Example Client Connection (SaaS Bridge to Local Ollama)
-
-```bash
-curl -X POST http://localhost:8000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "What is Python?",
-    "ollama_endpoint": "http://localhost:11434",
-    "model_name": "gemma3:1b",
-    "enable_guard": true
-  }'
+# Verify Nuxt static generation
+cd frontend && npm run generate
 ```
 
 ---
 
-## 💎 The Billion-Dollar Enterprise SaaS Vision
+## 📡 REST API Reference
 
-In modern enterprise workflows, LLMs are not isolated chat components; they are autonomous agents executing tool calls, database operations, and file queries. Ravel is positioned to lead the transition from simple text moderation to a comprehensive **Runtime Security Operations Center (SOC) for AI Agents**.
+All requests accept `Authorization: Bearer <jwt_token>` for authenticated routes.
 
-Our platform roadmap expands upon five enterprise capabilities:
+### Authentication & Users
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register a new user (first user automatically promoted to admin) |
+| `POST` | `/api/auth/login` | Authenticate user credentials and receive JWT bearer token |
+| `GET` | `/api/auth/me` | Fetch active user profile and role |
+| `POST` | `/api/auth/logout` | Revoke active session token |
 
-### 1. Agent Runtime Firewall
-Instead of only analyzing text prompts, Ravel monitors tool calls. The platform hooks into agent frameworks (e.g., CrewAI, LangGraph, MCP) and intercepts outgoing tool schema requests (e.g., `execute_sql`, `read_file`, `send_email`). Ravel evaluates the tool arguments against the enterprise compliance matrix in real-time, blocking unauthorized command parameters.
+### Security Gateway & Pipeline
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/chat` | Main shielded conversation route with stage flags |
+| `POST` | `/api/query` | Single-turn prompt submission through the security pipeline |
+| `POST` | `/api/query/raw` | Bypass security pipeline for red-team benchmarking |
+| `GET` | `/api/health` | Healthcheck and Ollama connectivity status |
+| `GET` | `/api/telemetry` | Recent transaction traces and latency metrics |
+| `GET` | `/api/requests/history` | Historical audit logs of processed queries |
+| `POST` | `/api/reset-metrics` | Reset telemetry counters and transaction logs |
 
-### 2. Context Drift & Semantic Displacement Detection
-In multi-turn conversations, attackers use gradual prompting to push an agent away from its system boundaries. Ravel calculates semantic vector trajectories across conversation steps, alerting security teams when the conversation moves from user support to administrative instruction injection.
+### Agent Memory Bank
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/memories` | Retrieve stored memories filtered by persona template |
+| `POST` | `/api/memories` | Manually store an agent memory with importance score |
+| `PUT` | `/api/memories/{id}` | Update memory content or importance |
+| `DELETE` | `/api/memories/{id}` | Delete memory from the vector index |
+| `GET` | `/api/memories/export` | Export memory bank to Markdown |
+| `POST` | `/api/memories/import` | Import memory bank from Markdown |
 
-### 3. Direct & Indirect RAG Poisoning Scanners
-Enterprise data sources (Notion databases, Confluence, Confluence pages, PDF attachments) can contain hidden instruction payloads designed to execute whenever an agent indexes them. Ravel acts as a document quarantine layer, scanning files at ingestion time for adversarial system command templates.
-
-### 4. Decentralized Threat Signature Network
-Ravel aggregates anonymized security events across tenants. If Tenant A is attacked with a novel jailbreak prompt, Ravel extracts the signature vector and publishes it to all active security nodes globally, providing immediate immunization for all enterprise customers.
-
-### 5. Conversation Replay & Incident Forensics
-When a model outputs sensitive data or runs a destructive script, security operations centers need to audit the event sequence. Ravel records full conversation graphs (inputs, vector matches, reasoning chains, and tool responses) as forensic logs, offering interactive replay timelines for audits.
-
----
-
-## 📂 Project Structure
-
-```
-ravel/
-├── backend/
-│   ├── app.py                # FastAPI application
-│   ├── config.py             # Configuration constants
-│   ├── pipeline/             # 6-stage selective compute pipeline
-│   ├── data/                 # Datasets and keyword blocklists
-│   ├── scripts/              # Offline training & vector seeding scripts
-│   └── telemetry/            # Prometheus counters
-├── frontend/
-│   ├── index.html            # SPA entry HTML
-│   ├── style.css             # Main styling sheet
-│   └── js/                   # SPA Client router, store, pages, and components
-├── benchmarks/               # Performance and load testing
-├── research/                 # Academic paper draft
-├── Dockerfile
-└── docker-compose.yml
-```
-
----
-
-
-
-## 🌻 License
-
-This project is open-source software licensed under the [MIT License](LICENSE.md).
+### Administration & Policies
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/admin/stats` | System-wide aggregates (users, sessions, deflections) |
+| `GET` | `/api/admin/users` | List all registered users |
+| `GET` | `/api/admin/threats` | Global blocked threat audit trail |
+| `GET` | `/api/policy` | Read active YAML security policy |
+| `POST` | `/api/policy` | Hot-reload YAML security policy |
+| `GET` | `/metrics` | Prometheus telemetry metrics |
 
 ---
 
+## 🔒 Security & Vulnerability Reporting
 
+Please review our [Security Policy](SECURITY.md) for details on supported versions and responsible disclosure. To report a security vulnerability, please submit a private advisory via GitHub or contact `security@ravel.dev`.
 
+---
 
-<h4 align="center">Support Open Source Development</h4>
+## 🤝 Contributing
 
-<div align="center">
+We welcome contributions from the AI security, NLP, and open-source developer communities! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and code guidelines, and review our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?style=for-the-badge&logo=github)](https://github.com/sponsors/Syf-Almjd)
+---
 
-</div>
-<p align="center">
-  Created with 💙 by <a href="https://github.com/Syf-Almjd">SaifAlmajd</a>
-</p>
+## 📄 License
+
+Ravel is open-source software licensed under the [MIT License](LICENSE).

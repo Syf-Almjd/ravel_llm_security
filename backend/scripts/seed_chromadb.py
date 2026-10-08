@@ -13,7 +13,6 @@ sys.path.insert(0, BACKEND_DIR)
 
 import config
 
-
 # ── Pre-built fact-cards covering AI safety domain ───────────
 
 FACT_CARDS = [

@@ -14,7 +14,9 @@ at runtime. Changes take effect immediately — no restart needed.
 """
 
 import os
+
 import yaml  # PyYAML — parses YAML config files
+
 import config
 
 # Where the policy file lives
@@ -60,7 +62,7 @@ def load_policy_yaml() -> str:
         with open(POLICY_FILE_PATH, "w") as f:
             f.write(DEFAULT_POLICY)
         return DEFAULT_POLICY
-    with open(POLICY_FILE_PATH, "r") as f:
+    with open(POLICY_FILE_PATH) as f:
         return f.read()
 
 def save_policy_yaml(yaml_content: str):
@@ -79,24 +81,24 @@ def apply_policy_to_runtime(parsed_policy: dict):
     """Dynamically update config.py constants from parsed policy dict."""
     if not parsed_policy:
         return
-    
+
     # 1. Guard SLM settings
     guard_cfg = parsed_policy.get("guard_slm", {})
     if "threat_threshold" in guard_cfg:
         config.GUARD_CONFIDENCE_THRESHOLD = float(guard_cfg["threat_threshold"])
-    
+
     # 2. EASE Routing settings
     ease_cfg = parsed_policy.get("ease_routing", {})
     if "trigger_complexity_threshold" in ease_cfg:
         config.EASE_COT_THRESHOLD = float(ease_cfg["trigger_complexity_threshold"])
-        
+
     # 3. DRAG RAG settings
     drag_cfg = parsed_policy.get("drag_rag", {})
     if "similarity_k" in drag_cfg:
         config.RAG_TOP_K = int(drag_cfg["similarity_k"])
     if "confidence_cutoff" in drag_cfg:
         config.RAG_MIN_RELEVANCE = float(drag_cfg["confidence_cutoff"])
-        
+
     # 4. DoLa Decoding settings
     dola_cfg = parsed_policy.get("dola_decoding", {})
     if "hallucination_penalty" in dola_cfg:

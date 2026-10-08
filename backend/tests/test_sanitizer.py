@@ -3,6 +3,7 @@ Unit tests for Stage 1: Input Sanitizer.
 """
 
 import pytest
+
 from pipeline import PipelineContext
 from pipeline.sanitizer import Sanitizer
 

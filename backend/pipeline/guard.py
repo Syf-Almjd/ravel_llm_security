@@ -23,14 +23,14 @@ It's trained by the train_guard.py script on labeled data.
 import json
 import os
 import re
-import numpy as np
-from pipeline import PipelineContext
+
 import config
+from pipeline import PipelineContext
 
 
 class Guard:
     """Stage 2: ML-based safety check.
-    
+
     Why SVM instead of another LLM?
     - Speed: SVM runs in ~2ms vs. 100-500ms for an LLM guard
     - Cost: No GPU needed, runs on CPU
@@ -62,7 +62,7 @@ class Guard:
             self.blocklist_patterns = [re.compile(p, re.IGNORECASE) for p in defaults]
             return
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
         self.blocklist_patterns = [
             re.compile(p, re.IGNORECASE) for p in data.get("patterns", [])
@@ -96,12 +96,12 @@ class Guard:
 
     def _check_svm(self, text: str) -> tuple[bool, float]:
         """Run the ML classifier on the input.
-        
+
         How it works:
         1. Convert text → numbers using TF-IDF (measures word importance)
         2. Feed those numbers into the SVM (finds the boundary between safe/unsafe)
         3. Get a probability score (how likely is this input safe vs. unsafe?)
-        
+
         Returns (is_safe, confidence_score)."""
         if self.svm is None or self.vectorizer is None:
             # No model loaded yet — be permissive but flag low confidence

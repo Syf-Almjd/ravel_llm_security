@@ -38,7 +38,7 @@ class SLMInference:
 
     def _wrap_cot(self, prompt: str) -> str:
         """Wrap the prompt with Chain-of-Thought instructions.
-        
+
         This tells the AI: "Think step by step before answering."
         Research shows this improves accuracy on complex questions significantly.
         Only applied when EASE routes the query to COT or BORDERLINE."""
