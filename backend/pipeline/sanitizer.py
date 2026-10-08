@@ -125,5 +125,9 @@ class Sanitizer:
             ctx.guard_confidence = 0.95  # We're very sure this is an injection
             ctx.guard_method = "sanitizer_injection"
             ctx.guard_blocked = True  # This tells the pipeline to skip all later stages
+            ctx.slm_response = (
+                "I cannot process this request. "
+                "Prompt injection pattern detected by input sanitizer."
+            )
 
         return ctx

@@ -100,7 +100,7 @@ class Pipeline:
         The name is used for telemetry and for toggling stages on/off."""
         self.steps.append((name, step))
 
-    async def run(self, raw_input: str, config: dict = None) -> PipelineContext:
+    async def run(self, raw_input: str, config: dict | None = None) -> PipelineContext:
         """Run the full pipeline on a user input.
         
         Args:

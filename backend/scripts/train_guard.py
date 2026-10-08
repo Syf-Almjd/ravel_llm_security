@@ -15,13 +15,13 @@ Run: python scripts/train_guard.py
 
 import json
 import os
-import sys
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer  # Converts text → numbers
-from sklearn.svm import SVC                                    # Support Vector Classifier
-from sklearn.model_selection import cross_val_score            # Validates model accuracy
-from sklearn.metrics import classification_report
 import joblib  # For saving/loading trained models
+import numpy as np
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.feature_extraction.text import TfidfVectorizer  # Converts text → numbers
+from sklearn.metrics import classification_report
+from sklearn.model_selection import StratifiedKFold, cross_val_score  # Validates model accuracy
+from sklearn.svm import LinearSVC
 
 # Paths — everything is relative to the backend directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -245,20 +245,19 @@ def train():
     X = vectorizer.fit_transform(texts)
     print(f"  Feature matrix shape: {X.shape}")
 
-    # Train SVM
-    print("\n[3/4] Training SVM classifier...")
-    svm = SVC(
-        kernel="rbf",
-        C=10.0,
-        gamma="scale",
-        probability=True,          # Enable predict_proba
-        class_weight="balanced",   # Handle class imbalance
+    # Train SVM with calibrated probabilities
+    print("\n[3/4] Training calibrated SVM classifier...")
+    base_svm = LinearSVC(
+        C=1.5,
+        class_weight="balanced",
         random_state=42,
     )
+    svm = CalibratedClassifierCV(base_svm)
 
-    # Cross-validation
-    cv_scores = cross_val_score(svm, X, labels, cv=5, scoring="f1")
-    print(f"  5-Fold CV F1 scores: {[round(s, 3) for s in cv_scores]}")
+    # Cross-validation with stratified shuffling
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(svm, X, labels, cv=cv, scoring="f1")
+    print(f"  5-Fold CV F1 scores: {[round(float(s), 3) for s in cv_scores]}")
     print(f"  Mean F1: {cv_scores.mean():.3f} (+/- {cv_scores.std():.3f})")
 
     # Final training on all data
@@ -281,7 +280,7 @@ def train():
 
     print(f"  SVM model saved to: {svm_path}")
     print(f"  Vectorizer saved to: {vec_path}")
-    print(f"\n  Model file sizes:")
+    print("\n  Model file sizes:")
     print(f"    SVM: {os.path.getsize(svm_path) / 1024:.1f} KB")
     print(f"    Vectorizer: {os.path.getsize(vec_path) / 1024:.1f} KB")
     print("\n✓ Training complete!")

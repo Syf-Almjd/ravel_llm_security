@@ -30,9 +30,9 @@ Score → Verdict:
 """
 
 import re
-import math
-from pipeline import PipelineContext
+
 import config
+from pipeline import PipelineContext
 
 
 class RISScorer:
